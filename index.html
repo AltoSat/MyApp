@@ -38,22 +38,24 @@
 [hidden]{display:none !important}
 
 /* ===== iOS PWA 黒帯対策 ===== */
+/* position:fixed / -webkit-fill-available を廃止し、
+   html・body を 100dvh（フォールバック:100%）で統一。 */
 html{
-  height:100%;
-  height:-webkit-fill-available;
   margin:0;
   padding:0;
+  width:100%;
+  height:100%;
+  height:100dvh;
   overflow:hidden;
   background:#000;
   overscroll-behavior:none;
 }
 body{
-  position:fixed;
-  inset:0;
-  width:100%;
-  height:100%;
   margin:0;
   padding:0;
+  width:100%;
+  height:100%;
+  height:100dvh;
   overflow:hidden;
   background:#000;
   color:var(--text);
@@ -74,7 +76,17 @@ button.ghost{background:transparent;border:1px solid var(--sep)}
 button:active{transform:scale(.97);opacity:.85}
 button:disabled{opacity:.4;pointer-events:none}
 
-.app{height:100%;display:flex;width:100%}
+/* ===== ルート:セーフエリアをここで一括処理 ===== */
+.app{
+  height:100%;
+  width:100%;
+  display:flex;
+  overflow:hidden;
+  padding-top:env(safe-area-inset-top, 0px);
+  padding-bottom:env(safe-area-inset-bottom, 0px);
+  padding-left:env(safe-area-inset-left, 0px);
+  padding-right:env(safe-area-inset-right, 0px);
+}
 
 /* ================= SIDEBAR ================= */
 .sidebar{
@@ -94,7 +106,8 @@ button:disabled{opacity:.4;pointer-events:none}
   overflow-y:auto;overflow-x:hidden;
   -webkit-overflow-scrolling:touch;
   overscroll-behavior:contain;
-  padding:calc(10px + env(safe-area-inset-top)) 8px 8px;
+  /* .app 側でセーフエリアを処理済みのため env() は使わない */
+  padding:10px 8px 8px;
   touch-action:pan-y;
 }
 .side-scroll::-webkit-scrollbar{width:0}
@@ -106,7 +119,8 @@ button:disabled{opacity:.4;pointer-events:none}
 
 .side-foot{
   flex:0 0 auto;
-  padding:8px 8px calc(8px + env(safe-area-inset-bottom));
+  /* .app 側でセーフエリアを処理済み */
+  padding:8px 8px 8px;
   border-top:1px solid #2c2c2e;
   display:flex;
   gap:6px;
@@ -274,7 +288,7 @@ button:disabled{opacity:.4;pointer-events:none}
 .sidebar:not(.open) .row-chev{display:none}
 
 .sidebar:not(.open) .side-scroll{
-  padding:calc(8px + env(safe-area-inset-top)) 5px 5px;
+  padding:8px 5px 5px;
 }
 .sidebar:not(.open) .swipe{
   margin-bottom:1px;
@@ -329,6 +343,7 @@ button:disabled{opacity:.4;pointer-events:none}
   animation:listFadeInRight .24s cubic-bezier(.22,.8,.24,1) both;
 }
 
+/* drag-folders は .app の外にあるため env() を維持 */
 .drag-folders{
   position:fixed;top:0;left:0;right:0;z-index:80;
   display:none;gap:8px;flex-wrap:nowrap;align-items:center;
@@ -393,7 +408,8 @@ button:disabled{opacity:.4;pointer-events:none}
 .toolbar{
   flex:0 0 auto;
   display:flex;align-items:center;gap:8px;
-  padding:calc(6px + env(safe-area-inset-top)) 12px 6px;
+  /* .app 側でセーフエリアを処理済み */
+  padding:6px 12px 6px;
 }
 .dev-btn{
   min-height:36px;border-radius:18px;padding:0 16px;font-size:13px;font-weight:700;
@@ -419,7 +435,8 @@ button:disabled{opacity:.4;pointer-events:none}
   flex:1;min-height:0;min-width:0;
   display:flex;align-items:center;justify-content:center;
   overflow:hidden;
-  padding:4px 8px calc(6px + env(safe-area-inset-bottom));
+  /* .app 側でセーフエリアを処理済み */
+  padding:4px 8px 6px;
 }
 
 .phone{
