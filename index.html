@@ -6,7 +6,16 @@
 <meta name="theme-color" content="#000">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Myアプリ">
 <title>Myアプリ</title>
+
+<!-- ===== PWA アイコン ===== -->
+<link rel="icon" type="image/png" href="icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icon.png">
+<link rel="apple-touch-icon" sizes="152x152" href="icon.png">
+<link rel="apple-touch-icon" sizes="120x120" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+
 <style>
 :root{
   color-scheme:dark;
@@ -770,7 +779,6 @@ textarea:focus{border-color:var(--accent)}
 (() => {
   const $ = id => document.getElementById(id);
 
-  /* ---- storage keys ---- */
   const NOTES_KEY        = "pwa-previewer-items-v2";
   const FOLDERS_KEY      = "pwa-previewer-folders-v1";
   const OLD_KEY          = "iphone17pro-pwa-preview-html-v1";
@@ -815,9 +823,6 @@ textarea:focus{border-color:var(--accent)}
     trash:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>`
   };
 
-  /* =========================================================
-     utils
-  ========================================================= */
   function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 
   function escapeHtml(s){
@@ -921,9 +926,6 @@ textarea:focus{border-color:var(--accent)}
     return t.slice(0, 80);
   }
 
-  /* =========================================================
-     persistence
-  ========================================================= */
   function getLastExportAt(){
     const v = localStorage.getItem(LAST_EXPORT_KEY);
     const n = v ? Number(v) : 0;
@@ -1014,9 +1016,6 @@ textarea:focus{border-color:var(--accent)}
     persist();
   }
 
-  /* =========================================================
-     previews
-  ========================================================= */
   function fitIframe(iframe, wrapEl, deviceW, deviceH){
     if(!wrapEl) return;
     const rect = wrapEl.getBoundingClientRect();
@@ -1127,9 +1126,6 @@ textarea:focus{border-color:var(--accent)}
     requestAnimationFrame(resizeAllPreviews);
   }
 
-  /* =========================================================
-     外側タップ処理
-  ========================================================= */
   function handleOutsideTap(){
     const openSwipes = $("sideList").querySelectorAll(".swipe.open");
     if(openSwipes.length > 0){
@@ -1153,9 +1149,6 @@ textarea:focus{border-color:var(--accent)}
     handleOutsideTap();
   });
 
-  /* =========================================================
-     toast
-  ========================================================= */
   let toastTimer = null;
   function showToast(msg){
     const t = $("toast");
@@ -1165,9 +1158,6 @@ textarea:focus{border-color:var(--accent)}
     toastTimer = setTimeout(() => t.classList.remove("show"), 1300);
   }
 
-  /* =========================================================
-     sidebar swipe hint
-  ========================================================= */
   function updateSwipeHint(dx){
     const hint = $("swipeHint");
     let text = "", ready = false, show = false, action = "";
@@ -1229,9 +1219,6 @@ textarea:focus{border-color:var(--accent)}
     hint.classList.remove("show", "ready", "menu-ready");
   }
 
-  /* =========================================================
-     render
-  ========================================================= */
   function render(animate, dir){
     const list = $("sideList");
     const isRoot = currentFolderId === null;
@@ -1332,9 +1319,6 @@ textarea:focus{border-color:var(--accent)}
     </div>`;
   }
 
-  /* =========================================================
-     サイドバージェスチャ
-  ========================================================= */
   function handleSidebarSwipe(dx){
     if(!sidebarOpen){
       if(currentFolderId !== null){
@@ -1358,9 +1342,6 @@ textarea:focus{border-color:var(--accent)}
     }
   }
 
-  /* =========================================================
-     swipe / drag
-  ========================================================= */
   let dragActive = false;
   let dragEndedAt = 0;
   let dragCtx = null;
@@ -1777,9 +1758,6 @@ textarea:focus{border-color:var(--accent)}
     if(dragActive && e.cancelable) e.preventDefault();
   }, { passive: false });
 
-  /* =========================================================
-     navigation / actions
-  ========================================================= */
   function openFolder(id){
     currentFolderId = id;
     closeAllSwipes();
@@ -1807,9 +1785,6 @@ textarea:focus{border-color:var(--accent)}
     else if(act === "del") deleteNote(id);
   }
 
-  /* =========================================================
-     folder edit sheet
-  ========================================================= */
   let editingFolderId = null;
 
   function openFolderEdit(id){
@@ -1908,9 +1883,6 @@ textarea:focus{border-color:var(--accent)}
     showToast("移動しました");
   }
 
-  /* =========================================================
-     folder picker
-  ========================================================= */
   let pickerNoteId = null;
 
   function openFolderPicker(noteId){
@@ -1939,15 +1911,9 @@ textarea:focus{border-color:var(--accent)}
     $("pickerOverlay").classList.remove("show");
   }
 
-  /* =========================================================
-     settings
-  ========================================================= */
   function openSettings(){ $("settingsOverlay").classList.add("show"); }
   function closeSettings(){ $("settingsOverlay").classList.remove("show"); }
 
-  /* =========================================================
-     editor
-  ========================================================= */
   let searchMatches = [];
   let searchIndex = -1;
   let editingIcon = null;
@@ -2023,7 +1989,6 @@ textarea:focus{border-color:var(--accent)}
     if(editingId){
       const it = items.find(x => x.id === editingId);
       if(it){
-        /* 1つ前のバージョンを記憶（現在の内容を prev に退避） */
         it.prevHtml = it.html || "";
         it.prevUpdated = it.updated || Date.now();
 
@@ -2122,9 +2087,6 @@ textarea:focus{border-color:var(--accent)}
   $("iconPreview").onclick = () => $("iconFile").click();
   nameInput.addEventListener("input", () => { if(!validIcon(editingIcon)) renderIconPreview(); });
 
-  /* =========================================================
-     search in editor
-  ========================================================= */
   function clearSearchHighlight(){
     searchMatches = [];
     searchIndex = -1;
@@ -2214,9 +2176,6 @@ textarea:focus{border-color:var(--accent)}
     document.body.removeChild(mirror);
   }
 
-  /* =========================================================
-     fullscreen
-  ========================================================= */
   function openFullscreen(){
     const it = items.find(x => x.id === selectedId);
     if(!it){ alert("表示するメモを一覧から選んでください"); return; }
@@ -2225,9 +2184,6 @@ textarea:focus{border-color:var(--accent)}
     requestAnimationFrame(resizeFullscreen);
   }
 
-  /* =========================================================
-     device / sidebar
-  ========================================================= */
   function setDevice(d){
     currentDevice = d;
     $("phone").hidden = d !== "phone";
@@ -2250,9 +2206,6 @@ textarea:focus{border-color:var(--accent)}
     });
   }
 
-  /* =========================================================
-     export / import
-  ========================================================= */
   function exportAll(){
     const data = {
       app: "pwa-previewer",
@@ -2289,7 +2242,6 @@ textarea:focus{border-color:var(--accent)}
       document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 1500);
 
-      /* エクスポート時刻を記録 → バッジをリセット */
       setLastExportAt(Date.now());
       updateExportBadge();
 
@@ -2401,9 +2353,6 @@ textarea:focus{border-color:var(--accent)}
     }
   }
 
-  /* =========================================================
-     events
-  ========================================================= */
   document.querySelectorAll(".dev-btn").forEach(b => {
     b.onclick = () => setDevice(b.dataset.dev);
   });
@@ -2510,9 +2459,6 @@ textarea:focus{border-color:var(--accent)}
   window.visualViewport?.addEventListener("resize", adjustEditorForKeyboard);
   window.visualViewport?.addEventListener("scroll", adjustEditorForKeyboard);
 
-  /* =========================================================
-     init
-  ========================================================= */
   load();
   setSidebar(sidebarOpen);
   render();
