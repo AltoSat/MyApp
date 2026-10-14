@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#000">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Myアプリ">
@@ -37,25 +38,34 @@
 *{box-sizing:border-box}
 [hidden]{display:none !important}
 
-/* ===== iOS PWA 黒帯対策 ===== */
-/* position:fixed / -webkit-fill-available を廃止し、
-   html・body を 100dvh（フォールバック:100%）で統一。 */
+/* ===== iOS PWA 黒帯対策 =====
+   1) 高さは 100dvh を基本にし、JSが実測した --app-h で上書きする。
+      iOSスタンドアロン（viewport-fit=cover）では、dvh/vh/innerHeight が
+      セーフエリア分だけ短く報告される WebKit の既知の挙動があり、
+      そのままでは画面下に黒帯が残るため。
+   2) position:fixed / inset:0 / -webkit-fill-available は使わない
+      （スタンドアロンでは fixed の基準もセーフエリア内側になるため）。
+   3) セーフエリアの余白は「各ペインの内側」で確保し、背景は画面の端まで
+      描画する（ルートに padding を付けると背景が届かず黒帯に見える）。 */
 html{
   margin:0;
   padding:0;
   width:100%;
-  height:100%;
-  height:100dvh;
+  height:100vh;                  /* フォールバック */
+  height:100dvh;                 /* フォールバック（dvh対応ブラウザ） */
+  height:var(--app-h,100dvh);    /* JS実測値（iOSスタンドアロン対策） */
   overflow:hidden;
   background:#000;
   overscroll-behavior:none;
+  -webkit-text-size-adjust:100%;
 }
 body{
   margin:0;
   padding:0;
   width:100%;
-  height:100%;
+  height:100vh;
   height:100dvh;
+  height:var(--app-h,100dvh);
   overflow:hidden;
   background:#000;
   color:var(--text);
@@ -82,8 +92,8 @@ button:disabled{opacity:.4;pointer-events:none}
   width:100%;
   display:flex;
   overflow:hidden;
-  padding-top:env(safe-area-inset-top, 0px);
-  padding-bottom:env(safe-area-inset-bottom, 0px);
+  /* 上下のセーフエリアは各ペイン（.sidebar / .main）の内側で確保する。
+     ここに padding を付けると背景が届かず、黒帯として見えてしまう。 */
   padding-left:env(safe-area-inset-left, 0px);
   padding-right:env(safe-area-inset-right, 0px);
 }
@@ -98,6 +108,9 @@ button:disabled{opacity:.4;pointer-events:none}
   transition:width .22s cubic-bezier(.22,.8,.24,1);
   overflow:hidden;
   position:relative;z-index:20;
+  /* Dynamic Island / ステータスバー・Home Bar 分を内側に確保（背景は端まで） */
+  padding-top:env(safe-area-inset-top, 0px);
+  padding-bottom:env(safe-area-inset-bottom, 0px);
 }
 .sidebar.open{width:var(--side-open)}
 
@@ -106,7 +119,7 @@ button:disabled{opacity:.4;pointer-events:none}
   overflow-y:auto;overflow-x:hidden;
   -webkit-overflow-scrolling:touch;
   overscroll-behavior:contain;
-  /* .app 側でセーフエリアを処理済みのため env() は使わない */
+  /* セーフエリアは .sidebar の padding で確保済み */
   padding:10px 8px 8px;
   touch-action:pan-y;
 }
@@ -119,7 +132,7 @@ button:disabled{opacity:.4;pointer-events:none}
 
 .side-foot{
   flex:0 0 auto;
-  /* .app 側でセーフエリアを処理済み */
+  /* セーフエリアは .sidebar の padding で確保済み */
   padding:8px 8px 8px;
   border-top:1px solid #2c2c2e;
   display:flex;
@@ -379,7 +392,7 @@ button:disabled{opacity:.4;pointer-events:none}
 
 .swipe-hint{
   position:fixed;
-  top:50%;
+  top:calc(var(--app-h,100dvh) / 2);
   left:90px;
   transform:translateY(-50%) translateX(-10px) scale(.85);
   background:var(--accent);
@@ -404,11 +417,15 @@ button:disabled{opacity:.4;pointer-events:none}
 .main{
   flex:1;min-width:0;display:flex;flex-direction:column;
   min-height:0;
+  background:#000;
+  /* Dynamic Island / Home Bar 分を内側に確保 */
+  padding-top:env(safe-area-inset-top, 0px);
+  padding-bottom:env(safe-area-inset-bottom, 0px);
 }
 .toolbar{
   flex:0 0 auto;
   display:flex;align-items:center;gap:8px;
-  /* .app 側でセーフエリアを処理済み */
+  /* セーフエリアは .main の padding で確保済み */
   padding:6px 12px 6px;
 }
 .dev-btn{
@@ -435,7 +452,7 @@ button:disabled{opacity:.4;pointer-events:none}
   flex:1;min-height:0;min-width:0;
   display:flex;align-items:center;justify-content:center;
   overflow:hidden;
-  /* .app 側でセーフエリアを処理済み */
+  /* セーフエリアは .main の padding で確保済み */
   padding:4px 8px 6px;
 }
 
@@ -497,13 +514,17 @@ button:disabled{opacity:.4;pointer-events:none}
 
 /* ================= SHEETS ================= */
 .editor-overlay{
-  position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.55);
+  /* inset:0 だとスタンドアロンでセーフエリア内側が基準になるため、
+     実測した --app-h を明示する */
+  position:fixed;top:0;left:0;right:0;
+  height:var(--app-h,100dvh);
+  z-index:90;background:rgba(0,0,0,.55);
   display:none;align-items:flex-end;justify-content:center;
   overscroll-behavior:none;
 }
 .editor-overlay.show{display:flex}
 .editor-sheet{
-  width:100%;max-width:900px;max-height:92vh;
+  width:100%;max-width:900px;max-height:92%;
   background:var(--bg);border-radius:20px 20px 0 0;
   box-shadow:0 -10px 40px #000;
   overscroll-behavior:contain;
@@ -574,7 +595,7 @@ textarea:focus{border-color:var(--accent)}
 .search-box #btnSave{min-height:42px;min-width:66px;font-size:14px;font-weight:700}
 
 .picker-sheet{
-  width:100%;max-width:520px;max-height:72vh;
+  width:100%;max-width:520px;max-height:72%;
   background:var(--bg);border-radius:20px 20px 0 0;
   padding:14px 14px calc(14px + env(safe-area-inset-bottom));
   display:flex;flex-direction:column;gap:12px;
@@ -613,7 +634,11 @@ textarea:focus{border-color:var(--accent)}
 .folder-edit-row .name-input:focus{border-color:var(--accent)}
 
 /* ================= FULLSCREEN ================= */
-.fullscreen{position:fixed;inset:0;z-index:100;background:#000;padding:0;display:none;overscroll-behavior:none;}
+.fullscreen{
+  position:fixed;top:0;left:0;right:0;
+  height:var(--app-h,100dvh);
+  z-index:100;background:#000;padding:0;display:none;overscroll-behavior:none;
+}
 .fullscreen.show{display:block}
 .fullscreen-stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden;overscroll-behavior:none;}
 .fullscreen iframe{border:0;background:#000;color-scheme:dark}
@@ -926,7 +951,7 @@ textarea:focus{border-color:var(--accent)}
         const hex = e.charAt(1).toLowerCase() === "x";
         const code = hex ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
         if(!isNaN(code) && code > 0 && code <= 0x10FFFF){
-          try{ return String.fromCodePoint(code); }catch(_){ return m; }
+          try{ return String.fromCodePoint(code); }catch(_){}
         }
         return m;
       }
@@ -1087,7 +1112,6 @@ textarea:focus{border-color:var(--accent)}
         (sh - 2*IPAD_B) / IPAD_H
       );
       const w = IPAD_W * k + 2*IPAD_B;
-      const h = IPAD_H * k + 2*IPAD_B;
       ipad.style.width  = w.toFixed(2) + "px";
       ipad.style.height = h.toFixed(2) + "px";
       const rad = Math.max(10, Math.min(w, h) * 0.06);
@@ -1108,7 +1132,56 @@ textarea:focus{border-color:var(--accent)}
     fullFrame.style.transformOrigin = "center center";
   }
 
+  /* ===== iOS PWA: 実測ビューポート高さ（黒帯対策） =====
+     スタンドアロンでは dvh/vh/innerHeight がセーフエリア分だけ短く報告される
+     ことがあるため、セーフエリアを実測して足し、画面高さでクランプする。 */
+  function isStandalone(){
+    try{
+      if(window.navigator.standalone === true) return true;
+      if(window.matchMedia){
+        if(window.matchMedia("(display-mode: standalone)").matches) return true;
+        if(window.matchMedia("(display-mode: fullscreen)").matches) return true;
+        if(window.matchMedia("(display-mode: minimal-ui)").matches) return true;
+      }
+    }catch(_){}
+    return false;
+  }
+
+  function measureSafeAreaInsets(){
+    const probe = document.createElement("div");
+    probe.style.cssText =
+      "position:fixed;top:0;left:0;width:0;height:0;visibility:hidden;pointer-events:none;" +
+      "padding-top:env(safe-area-inset-top,0px);" +
+      "padding-bottom:env(safe-area-inset-bottom,0px);";
+    document.body.appendChild(probe);
+    const cs = getComputedStyle(probe);
+    const top    = parseFloat(cs.paddingTop) || 0;
+    const bottom = parseFloat(cs.paddingBottom) || 0;
+    probe.remove();
+    return { top, bottom };
+  }
+
+  function syncAppHeight(){
+    const ins = measureSafeAreaInsets();
+    const ih  = window.innerHeight || 0;
+    const sh  = (window.screen && window.screen.height) ? window.screen.height : 0;
+
+    let h = ih + ins.top + ins.bottom;
+
+    if(sh > 0){
+      if(h > sh){
+        h = sh;                                  // 過剰に伸ばさない
+      }else if(isStandalone() && (sh - h) > 0 && (sh - h) <= 160){
+        h = sh;                                  // インセットが報告されない端末向け
+      }
+    }
+    if(h <= 0) return;
+
+    document.documentElement.style.setProperty("--app-h", h + "px");
+  }
+
   function relayout(){
+    syncAppHeight();
     fitDevices();
     resizeAllPreviews();
     resizeFullscreen();
@@ -2477,6 +2550,7 @@ textarea:focus{border-color:var(--accent)}
   window.visualViewport?.addEventListener("scroll", adjustEditorForKeyboard);
 
   load();
+  syncAppHeight();
   setSidebar(sidebarOpen);
   render();
   setDevice("phone");
@@ -2484,6 +2558,7 @@ textarea:focus{border-color:var(--accent)}
   updateExportBadge();
 
   requestAnimationFrame(() => {
+    syncAppHeight();
     fitDevices();
     resizeAllPreviews();
   });
