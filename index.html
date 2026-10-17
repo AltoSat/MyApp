@@ -38,15 +38,7 @@
 *{box-sizing:border-box}
 [hidden]{display:none !important}
 
-/* ===== iOS PWA 黒帯対策 =====
-   1) 高さは 100dvh を基本にし、JSが実測した --app-h で上書きする。
-      iOSスタンドアロン（viewport-fit=cover）では、dvh/vh/innerHeight が
-      セーフエリア分だけ短く報告される WebKit の既知の挙動があり、
-      そのままでは画面下に黒帯が残るため。
-   2) position:fixed / inset:0 / -webkit-fill-available は使わない
-      （スタンドアロンでは fixed の基準もセーフエリア内側になるため）。
-   3) セーフエリアの余白は「各ペインの内側」で確保し、背景は画面の端まで
-      描画する（ルートに padding を付けると背景が届かず黒帯に見える）。 */
+/* ===== iOS PWA 黒帯対策 ===== */
 html{
   margin:0;
   padding:0;
@@ -84,14 +76,12 @@ button.ghost{background:transparent;border:1px solid var(--sep)}
 button:active{transform:scale(.97);opacity:.85}
 button:disabled{opacity:.4;pointer-events:none}
 
-/* ===== ルート:セーフエリアをここで一括処理 ===== */
+/* ===== ルート ===== */
 .app{
   min-height:100dvh;
   width:100%;
   display:flex;
   overflow:hidden;
-  /* 上下のセーフエリアは各ペイン（.sidebar / .main）の内側で確保する。
-     ここに padding を付けると背景が届かず、黒帯として見えてしまう。 */
   padding-left:env(safe-area-inset-left, 0px);
   padding-right:env(safe-area-inset-right, 0px);
 }
@@ -107,7 +97,6 @@ button:disabled{opacity:.4;pointer-events:none}
   overflow:hidden;
   position:relative;z-index:20;
   min-height:0;
-  /* Dynamic Island / ステータスバー・Home Bar 分を内側に確保（背景は端まで） */
   padding-top:env(safe-area-inset-top, 0px);
   padding-bottom:env(safe-area-inset-bottom, 0px);
 }
@@ -118,7 +107,6 @@ button:disabled{opacity:.4;pointer-events:none}
   overflow-y:auto;overflow-x:hidden;
   -webkit-overflow-scrolling:touch;
   overscroll-behavior:contain;
-  /* セーフエリアは .sidebar の padding で確保済み */
   padding:10px 8px 8px;
   touch-action:pan-y;
 }
@@ -131,7 +119,6 @@ button:disabled{opacity:.4;pointer-events:none}
 
 .side-foot{
   flex:0 0 auto;
-  /* セーフエリアは .sidebar の padding で確保済み */
   padding:8px 8px 8px;
   border-top:1px solid #2c2c2e;
   display:flex;
@@ -150,7 +137,6 @@ button:disabled{opacity:.4;pointer-events:none}
 .foot-btn:hover{color:var(--text)}
 .foot-btn svg{width:20px;height:20px;display:block}
 
-/* 通知バッジ */
 .foot-btn .badge{
   position:absolute;
   top:4px;
@@ -355,7 +341,6 @@ button:disabled{opacity:.4;pointer-events:none}
   animation:listFadeInRight .24s cubic-bezier(.22,.8,.24,1) both;
 }
 
-/* drag-folders は .app の外にあるため env() を維持 */
 .drag-folders{
   position:fixed;top:0;left:0;right:0;z-index:80;
   display:none;gap:8px;flex-wrap:nowrap;align-items:center;
@@ -417,14 +402,12 @@ button:disabled{opacity:.4;pointer-events:none}
   flex:1;min-width:0;display:flex;flex-direction:column;
   min-height:0;
   background:#000;
-  /* Dynamic Island / Home Bar 分を内側に確保 */
   padding-top:env(safe-area-inset-top, 0px);
   padding-bottom:env(safe-area-inset-bottom, 0px);
 }
 .toolbar{
   flex:0 0 auto;
   display:flex;align-items:center;gap:8px;
-  /* セーフエリアは .main の padding で確保済み */
   padding:6px 12px 6px;
 }
 .dev-btn{
@@ -434,6 +417,7 @@ button:disabled{opacity:.4;pointer-events:none}
 .dev-btn.on{background:var(--accent);color:#fff}
 .toolbar .spacer{flex:1}
 .tool-btn{
+  position:relative;
   width:36px;
   height:36px;
   min-width:36px;
@@ -446,12 +430,23 @@ button:disabled{opacity:.4;pointer-events:none}
   justify-content:center;
 }
 .tool-btn svg{width:18px;height:18px}
+.tool-btn.has-memo::after{
+  content:"";
+  position:absolute;
+  top:5px;
+  right:5px;
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:var(--accent);
+  box-shadow:0 0 0 2px var(--panel2);
+  pointer-events:none;
+}
 
 .stage{
   flex:1;min-height:0;min-width:0;
   display:flex;align-items:center;justify-content:center;
   overflow:hidden;
-  /* セーフエリアは .main の padding で確保済み */
   padding:4px 8px 6px;
 }
 
@@ -490,10 +485,10 @@ button:disabled{opacity:.4;pointer-events:none}
 
 .ipad{
   position:relative;
-  width:460px;height:345px;
+  width:600px;height:450px;
   background:#000;
-  border:10px solid #2a2a2e;
-  border-radius:22px;
+  border:12px solid #2a2a2e;
+  border-radius:24px;
   overflow:hidden;
   box-shadow:0 14px 40px #000,0 0 0 1px #444;
   flex:0 0 auto;
@@ -506,9 +501,9 @@ button:disabled{opacity:.4;pointer-events:none}
 }
 .ipad-viewport iframe{
   position:absolute;top:50%;left:50%;
-  width:1080px;height:810px;border:0;background:#000;color-scheme:dark;
+  width:1366px;height:1024px;border:0;background:#000;color-scheme:dark;
   transform-origin:center center;
-  margin-left:-540px;margin-top:-405px;
+  margin-left:-683px;margin-top:-512px;
 }
 
 /* ================= SHEETS ================= */
@@ -679,6 +674,14 @@ textarea:focus{border-color:var(--accent)}
       <button class="dev-btn on" data-dev="phone">iPhone</button>
       <button class="dev-btn" data-dev="ipad">iPad</button>
       <div class="spacer"></div>
+      <button id="btnMemo" class="tool-btn" aria-label="メモ">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <path d="M14 2v6h6"/>
+          <path d="M8 13h8M8 17h6"/>
+        </svg>
+      </button>
       <button id="btnEdit" class="tool-btn" aria-label="編集">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
              stroke-linecap="round" stroke-linejoin="round">
@@ -727,10 +730,9 @@ textarea:focus{border-color:var(--accent)}
 
       <div class="editor-actions">
         <button id="btnCancel" class="ghost">キャンセル</button>
-        <button id="btnClear" class="ghost">クリア</button>
         <button id="btnRevert" class="ghost">1つ前</button>
+        <button id="btnClear" class="ghost">クリア</button>
         <button id="btnCopy" class="ghost">コピー</button>
-        <button id="btnPickIcon" class="ghost">アイコン</button>
       </div>
 
       <div class="editor-title-row">
@@ -805,6 +807,19 @@ textarea:focus{border-color:var(--accent)}
   </div>
 </div>
 
+<!-- MEMO SHEET -->
+<div id="memoOverlay" class="editor-overlay">
+  <div class="picker-sheet" style="max-height:85%">
+    <div class="sheet-handle"></div>
+    <h3>アプリメモ</h3>
+    <textarea id="memoText" placeholder="このアプリ専用のメモ" style="height:40vh;resize:vertical"></textarea>
+    <div class="editor-actions" style="margin:0">
+      <button id="memoCancel" class="ghost">キャンセル</button>
+      <button id="memoSave" class="primary">保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- FULLSCREEN PREVIEW -->
 <div id="fullscreen" class="fullscreen">
   <button class="exit" id="exit">×</button>
@@ -822,10 +837,9 @@ textarea:focus{border-color:var(--accent)}
   const FOLDERS_KEY      = "pwa-previewer-folders-v1";
   const OLD_KEY          = "iphone17pro-pwa-preview-html-v1";
   const LAST_EXPORT_KEY  = "pwa-previewer-last-export-v1";
-  const DEFAULT_FOLDER_NAME = "マイメモ";
 
   const PHONE_W = 402, PHONE_H = 874, PHONE_B = 6;
-  const IPAD_W  = 1080, IPAD_H  = 810, IPAD_B  = 10;
+  const IPAD_W  = 1366, IPAD_H  = 1024, IPAD_B  = 12;
 
   const SB_BACK_DX          = 45;
   const SB_EXPAND_DX_FOLDER = 200;
@@ -845,6 +859,7 @@ textarea:focus{border-color:var(--accent)}
   let currentFolderId = null;
   let sidebarOpen = window.innerWidth >= 760;
   let currentDevice = "phone";
+  let memoNoteId = null;
 
   const source     = $("source");
   const nameInput  = $("nameInput");
@@ -1034,20 +1049,17 @@ textarea:focus{border-color:var(--accent)}
     if(!Array.isArray(items)) items = [];
     items = items.filter(it => it && typeof it === "object");
 
-    if(folders.length === 0){
-      folders = [{ id: uid(), name: DEFAULT_FOLDER_NAME }];
-    }
-
     const fids = new Set(folders.map(f => f.id));
     items.forEach(it => {
       if(!it.id) it.id = uid();
       if(typeof it.name !== "string") it.name = "無題";
       if(typeof it.html !== "string") it.html = "";
       if(typeof it.updated !== "number") it.updated = Date.now();
-      if(!it.folderId || !fids.has(it.folderId)) it.folderId = folders[0].id;
+      if(!it.folderId || !fids.has(it.folderId)) it.folderId = folders[0]?.id || null;
       if(it.icon !== undefined && !validIcon(it.icon)) delete it.icon;
       if(it.prevHtml !== undefined && typeof it.prevHtml !== "string") delete it.prevHtml;
       if(it.prevUpdated !== undefined && typeof it.prevUpdated !== "number") delete it.prevUpdated;
+      if(typeof it.memo !== "string") it.memo = "";
     });
 
     selectedId = items.length ? items[0].id : null;
@@ -1059,7 +1071,8 @@ textarea:focus{border-color:var(--accent)}
     if(!wrapEl) return;
     const rect = wrapEl.getBoundingClientRect();
     if(!rect.width || !rect.height) return;
-    const scale = Math.max(rect.width / deviceW, rect.height / deviceH) * 1.002;
+    // アスペクト比が一致していればMath.min=Math.max。ズレがあっても拡大せずレターボックス
+    const scale = Math.min(rect.width / deviceW, rect.height / deviceH);
     iframe.style.transform = `scale(${scale})`;
   }
 
@@ -1115,7 +1128,7 @@ textarea:focus{border-color:var(--accent)}
       const rad = Math.max(10, Math.min(w, h) * 0.06);
       ipad.style.borderRadius = rad.toFixed(1) + "px";
       const vp = ipad.querySelector(".ipad-viewport");
-      vp.style.borderRadius = Math.max(0, rad - 8).toFixed(1) + "px";
+      vp.style.borderRadius = Math.max(0, rad - 10).toFixed(1) + "px";
     }
   }
 
@@ -1130,42 +1143,7 @@ textarea:focus{border-color:var(--accent)}
     fullFrame.style.transformOrigin = "center center";
   }
 
-  /* ===== iOS PWA: 実測ビューポート高さ（黒帯対策） =====
-     スタンドアロンでは dvh/vh/innerHeight がセーフエリア分だけ短く報告される
-     ことがあるため、セーフエリアを実測して足し、画面高さでクランプする。 */
-  function isStandalone(){
-    try{
-      if(window.navigator.standalone === true) return true;
-      if(window.matchMedia){
-        if(window.matchMedia("(display-mode: standalone)").matches) return true;
-        if(window.matchMedia("(display-mode: fullscreen)").matches) return true;
-        if(window.matchMedia("(display-mode: minimal-ui)").matches) return true;
-      }
-    }catch(_){}
-    return false;
-  }
-
-  function measureSafeAreaInsets(){
-    const probe = document.createElement("div");
-    probe.style.cssText =
-      "position:fixed;top:0;left:0;width:0;height:0;visibility:hidden;pointer-events:none;" +
-      "padding-top:env(safe-area-inset-top,0px);" +
-      "padding-bottom:env(safe-area-inset-bottom,0px);";
-    document.body.appendChild(probe);
-    const cs = getComputedStyle(probe);
-    const top    = parseFloat(cs.paddingTop) || 0;
-    const bottom = parseFloat(cs.paddingBottom) || 0;
-    probe.remove();
-    return { top, bottom };
-  }
-
-  function syncAppHeight(){
-    /* 現代CSS（dvh + env(safe-area-inset-*)）に任せるため、
-       高さハックは無効化しています。 */
-  }
-
   function relayout(){
-    syncAppHeight();
     fitDevices();
     resizeAllPreviews();
     resizeFullscreen();
@@ -1175,7 +1153,6 @@ textarea:focus{border-color:var(--accent)}
   window.addEventListener("orientationchange", () => setTimeout(relayout, 120));
   if(window.visualViewport){
     window.visualViewport.addEventListener("resize", relayout);
-    window.visualViewport.addEventListener("scroll", relayout);
   }
 
   if(window.ResizeObserver){
@@ -1191,12 +1168,19 @@ textarea:focus{border-color:var(--accent)}
     frameIpad.srcdoc = "";
   }
 
+  function updateMemoIndicator(){
+    const it = items.find(x => x.id === selectedId);
+    const hasMemo = !!(it && typeof it.memo === "string" && it.memo.trim());
+    $("btnMemo").classList.toggle("has-memo", hasMemo);
+  }
+
   function updatePreview(){
     const it = items.find(x => x.id === selectedId);
-    if(!it){ clearPreviews(); return; }
+    if(!it){ clearPreviews(); updateMemoIndicator(); return; }
     const html = (it.html || "") + TAP_BRIDGE;
     framePhone.srcdoc = html;
     frameIpad.srcdoc = html;
+    updateMemoIndicator();
     requestAnimationFrame(resizeAllPreviews);
   }
 
@@ -1921,7 +1905,6 @@ textarea:focus{border-color:var(--accent)}
     folders = folders.filter(x => x.id !== id);
 
     if(removedIds.includes(selectedId)) selectedId = items.length ? items[0].id : null;
-    if(folders.length === 0) folders = [{ id: uid(), name: DEFAULT_FOLDER_NAME }];
     if(currentFolderId === id) currentFolderId = null;
 
     persist();
@@ -1988,6 +1971,30 @@ textarea:focus{border-color:var(--accent)}
   function openSettings(){ $("settingsOverlay").classList.add("show"); }
   function closeSettings(){ $("settingsOverlay").classList.remove("show"); }
 
+  /* ===== MEMO ===== */
+  function openMemo(noteId){
+    const it = items.find(x => x.id === noteId);
+    if(!it) return;
+    memoNoteId = noteId;
+    $("memoText").value = typeof it.memo === "string" ? it.memo : "";
+    $("memoOverlay").classList.add("show");
+    setTimeout(() => { try{ $("memoText").focus(); }catch(_){} }, 60);
+  }
+  function closeMemo(){
+    $("memoOverlay").classList.remove("show");
+    memoNoteId = null;
+  }
+  function saveMemo(){
+    const it = items.find(x => x.id === memoNoteId);
+    if(!it){ closeMemo(); return; }
+    it.memo = ($("memoText").value || "").trim();
+    persist();
+    closeMemo();
+    render();
+    updatePreview();
+    showToast("メモを保存しました");
+  }
+
   let searchMatches = [];
   let searchIndex = -1;
   let editingIcon = null;
@@ -2037,12 +2044,12 @@ textarea:focus{border-color:var(--accent)}
     $("searchResult").textContent = "";
     clearSearchHighlight();
     $("editorOverlay").classList.add("show");
-    adjustEditorForKeyboard();
     setTimeout(() => { try{ nameInput.focus(); }catch(_){} }, 60);
   }
 
   function closeEditor(){
     $("editorOverlay").classList.remove("show");
+    $("editorOverlay").style.paddingBottom = "";
     document.querySelector(".editor-sheet").style.maxHeight = "";
   }
 
@@ -2075,7 +2082,11 @@ textarea:focus{border-color:var(--accent)}
       selectedId = editingId;
     }else{
       const fid = currentFolderId || (folders[0] && folders[0].id);
-      const note = { id: uid(), name, html, updated: Date.now(), folderId: fid };
+      if(!fid){
+        showToast("フォルダを作成してください");
+        return;
+      }
+      const note = { id: uid(), name, html, updated: Date.now(), folderId: fid, memo: "" };
       if(validIcon(editingIcon)) note.icon = editingIcon;
       const idx = items.findIndex(x => x.folderId === fid);
       if(idx === -1) items.push(note);
@@ -2157,7 +2168,6 @@ textarea:focus{border-color:var(--accent)}
     }
   });
 
-  $("btnPickIcon").onclick = () => $("iconFile").click();
   $("iconPreview").onclick = () => $("iconFile").click();
   nameInput.addEventListener("input", () => { if(!validIcon(editingIcon)) renderIconPreview(); });
 
@@ -2265,10 +2275,16 @@ textarea:focus{border-color:var(--accent)}
     document.querySelectorAll(".dev-btn").forEach(b => {
       b.classList.toggle("on", b.dataset.dev === d);
     });
+    // force reflow so rAF reads correct layout
+    void $("stage").offsetHeight;
     requestAnimationFrame(() => {
       fitDevices();
       resizeAllPreviews();
     });
+    setTimeout(() => {
+      fitDevices();
+      resizeAllPreviews();
+    }, 60);
   }
 
   function setSidebar(open){
@@ -2301,6 +2317,7 @@ textarea:focus{border-color:var(--accent)}
         if(validIcon(it.icon)) o.icon = it.icon;
         if(typeof it.prevHtml === "string") o.prevHtml = it.prevHtml;
         if(typeof it.prevUpdated === "number") o.prevUpdated = it.prevUpdated;
+        if(typeof it.memo === "string" && it.memo) o.memo = it.memo;
         return o;
       })
     };
@@ -2355,6 +2372,7 @@ textarea:focus{border-color:var(--accent)}
       if(validIcon(it.icon)) o.icon = it.icon;
       if(typeof it.prevHtml === "string") o.prevHtml = it.prevHtml;
       if(typeof it.prevUpdated === "number") o.prevUpdated = it.prevUpdated;
+      if(typeof it.memo === "string" && it.memo) o.memo = it.memo;
       outI.push(o);
     });
     return { folders: outF, items: outI };
@@ -2374,9 +2392,7 @@ textarea:focus{border-color:var(--accent)}
       );
 
       if(replace){
-        folders = parsed.folders.length
-          ? parsed.folders
-          : [{ id: uid(), name: DEFAULT_FOLDER_NAME }];
+        folders = parsed.folders;
         items = parsed.items;
       }else{
         const idMap = {};
@@ -2387,8 +2403,7 @@ textarea:focus{border-color:var(--accent)}
           if(f.emoji) nf.emoji = f.emoji;
           folders.push(nf);
         });
-        if(folders.length === 0) folders = [{ id: uid(), name: DEFAULT_FOLDER_NAME }];
-        const fallback = folders[0].id;
+        const fallback = folders[0]?.id || null;
         parsed.items.forEach(it => {
           const fid = idMap[it.folderId] || fallback;
           const note = {
@@ -2401,6 +2416,7 @@ textarea:focus{border-color:var(--accent)}
           if(it.icon) note.icon = it.icon;
           if(typeof it.prevHtml === "string") note.prevHtml = it.prevHtml;
           if(typeof it.prevUpdated === "number") note.prevUpdated = it.prevUpdated;
+          if(it.memo) note.memo = it.memo;
           items.push(note);
         });
       }
@@ -2411,8 +2427,9 @@ textarea:focus{border-color:var(--accent)}
         if(typeof it.name !== "string") it.name = "無題";
         if(typeof it.html !== "string") it.html = "";
         if(typeof it.updated !== "number") it.updated = Date.now();
-        if(!it.folderId || !fids.has(it.folderId)) it.folderId = folders[0].id;
+        if(!it.folderId || !fids.has(it.folderId)) it.folderId = folders[0]?.id || null;
         if(it.icon !== undefined && !validIcon(it.icon)) delete it.icon;
+        if(typeof it.memo !== "string") it.memo = "";
       });
 
       persist();
@@ -2478,6 +2495,19 @@ textarea:focus{border-color:var(--accent)}
     openEditor(selectedId, false);
   };
 
+  $("btnMemo").onclick = () => {
+    if(!selectedId){
+      showToast("メモするアプリを選択してください");
+      return;
+    }
+    openMemo(selectedId);
+  };
+  $("memoSave").onclick = saveMemo;
+  $("memoCancel").onclick = closeMemo;
+  $("memoOverlay").addEventListener("click", e => {
+    if(e.target === $("memoOverlay")) closeMemo();
+  });
+
   $("btnSave").onclick = saveCurrent;
   $("btnCancel").onclick = closeEditor;
   $("btnRevert").onclick = revertToPrevious;
@@ -2522,16 +2552,23 @@ textarea:focus{border-color:var(--accent)}
   $("btnSearchNext").onclick = () => runSearch("next");
   $("btnSearchPrev").onclick = () => runSearch("prev");
 
+  /* ===== キーボード表示時のオーバーレイ調整 =====
+     visualViewport の縮み分（＝キーボード高さ）だけ overlay の padding-bottom を増やし、
+     シートをキーボードの上に押し上げる。maxHeight をいじる旧方式は
+     iOS の自動スクロールと干渉して余計に画面が上に動くため廃止。 */
+  let kbdTimer = null;
   function adjustEditorForKeyboard(){
     if(!window.visualViewport) return;
-    const vv = window.visualViewport;
-    const sheet = document.querySelector(".editor-sheet");
-    if($("editorOverlay").classList.contains("show")){
-      sheet.style.maxHeight = (vv.height - 16) + "px";
-    }
+    clearTimeout(kbdTimer);
+    kbdTimer = setTimeout(() => {
+      const overlay = $("editorOverlay");
+      if(!overlay.classList.contains("show")) return;
+      const vv = window.visualViewport;
+      const kb = Math.max(0, window.innerHeight - vv.height - (vv.offsetTop || 0));
+      overlay.style.paddingBottom = kb > 0 ? Math.min(kb, window.innerHeight * 0.7) + "px" : "";
+    }, 60);
   }
   window.visualViewport?.addEventListener("resize", adjustEditorForKeyboard);
-  window.visualViewport?.addEventListener("scroll", adjustEditorForKeyboard);
 
   load();
   setSidebar(sidebarOpen);
