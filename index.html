@@ -1,3 +1,4 @@
+```html
 <!doctype html>
 <html lang="ja">
 <head>
@@ -38,13 +39,15 @@
 *{box-sizing:border-box}
 [hidden]{display:none !important}
 
-/* ===== iOS PWA 黒帯対策 ===== */
+/* ===== iOS PWA 黒帯対策 =====
+   - 高さは 100dvh を基本に、スタンドアロン時は JS が実測した --app-h で上書き。
+   - html/body/.app は「確定した高さ」を持たせる。min-height だけだと
+     サイドバーの項目増加でルートが伸び、下部が切れて黒帯/ボタン消失の原因になる。 */
 html{
   margin:0;
   padding:0;
   width:100%;
-  min-height:100dvh;
-  height:100dvh;
+  height:var(--app-h, 100dvh);
   overflow:hidden;
   background:#000;
   overscroll-behavior:none;
@@ -54,7 +57,6 @@ body{
   margin:0;
   padding:0;
   width:100%;
-  min-height:100dvh;
   height:100%;
   overflow:hidden;
   background:#000;
@@ -78,7 +80,7 @@ button:disabled{opacity:.4;pointer-events:none}
 
 /* ===== ルート ===== */
 .app{
-  min-height:100dvh;
+  height:100%;
   width:100%;
   display:flex;
   overflow:hidden;
@@ -97,6 +99,7 @@ button:disabled{opacity:.4;pointer-events:none}
   overflow:hidden;
   position:relative;z-index:20;
   min-height:0;
+  height:100%;
   padding-top:env(safe-area-inset-top, 0px);
   padding-bottom:env(safe-area-inset-bottom, 0px);
 }
@@ -401,6 +404,7 @@ button:disabled{opacity:.4;pointer-events:none}
 .main{
   flex:1;min-width:0;display:flex;flex-direction:column;
   min-height:0;
+  height:100%;
   background:#000;
   padding-top:env(safe-area-inset-top, 0px);
   padding-bottom:env(safe-area-inset-bottom, 0px);
@@ -625,6 +629,38 @@ textarea:focus{border-color:var(--accent)}
 }
 .folder-edit-row .name-input:focus{border-color:var(--accent)}
 
+/* ===== MEMO SHEET ===== */
+.memo-sheet{position:relative}
+.memo-close{
+  position:absolute;
+  top:8px;
+  right:10px;
+  width:30px;height:30px;min-width:30px;min-height:30px;
+  padding:0;
+  border-radius:50%;
+  background:transparent;
+  color:var(--muted);
+  font-size:18px;
+  font-weight:400;
+  line-height:1;
+  display:flex;align-items:center;justify-content:center;
+  z-index:3;
+}
+.memo-close:active{background:var(--panel2);transform:none;opacity:.85}
+.memo-text{
+  height:40vh;min-height:140px;
+  font-family:-apple-system,BlinkMacSystemFont,"SFMono-Regular",Menlo,monospace;
+  font-size:13.5px;
+}
+.memo-hint{
+  font-size:11px;
+  color:var(--muted);
+  text-align:center;
+  padding-top:0;
+  user-select:none;
+  -webkit-user-select:none;
+}
+
 /* ================= FULLSCREEN ================= */
 .fullscreen{
   position:fixed;
@@ -809,14 +845,13 @@ textarea:focus{border-color:var(--accent)}
 
 <!-- MEMO SHEET -->
 <div id="memoOverlay" class="editor-overlay">
-  <div class="picker-sheet" style="max-height:85%">
+  <div class="picker-sheet memo-sheet">
+    <button id="memoCancel" class="memo-close" aria-label="キャンセル">×</button>
     <div class="sheet-handle"></div>
     <h3>アプリメモ</h3>
-    <textarea id="memoText" placeholder="このアプリ専用のメモ" style="height:40vh;resize:vertical"></textarea>
-    <div class="editor-actions" style="margin:0">
-      <button id="memoCancel" class="ghost">キャンセル</button>
-      <button id="memoSave" class="primary">保存</button>
-    </div>
+    <textarea id="memoText" class="memo-text" placeholder="このアプリ専用のメモ"
+              spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off"></textarea>
+    <div class="memo-hint">何もない場所をタップで保存</div>
   </div>
 </div>
 
@@ -1071,7 +1106,6 @@ textarea:focus{border-color:var(--accent)}
     if(!wrapEl) return;
     const rect = wrapEl.getBoundingClientRect();
     if(!rect.width || !rect.height) return;
-    // アスペクト比が一致していればMath.min=Math.max。ズレがあっても拡大せずレターボックス
     const scale = Math.min(rect.width / deviceW, rect.height / deviceH);
     iframe.style.transform = `scale(${scale})`;
   }
@@ -1117,18 +1151,25 @@ textarea:focus{border-color:var(--accent)}
     }
 
     if(!ipad.hidden){
-      const k = Math.min(
+      // 枠の太さもデバイスサイズに合わせてスケールさせる
+      const k0 = Math.min(
         (sw - 2*IPAD_B) / IPAD_W,
         (sh - 2*IPAD_B) / IPAD_H
       );
-      const w = IPAD_W * k + 2*IPAD_B;
-      const h = IPAD_H * k + 2*IPAD_B;
+      const bw = Math.max(3, Math.min(IPAD_B, Math.round(IPAD_B * k0)));
+      const k = Math.min(
+        (sw - 2*bw) / IPAD_W,
+        (sh - 2*bw) / IPAD_H
+      );
+      const w = IPAD_W * k + 2*bw;
+      const h = IPAD_H * k + 2*bw;
+      ipad.style.borderWidth = bw + "px";
       ipad.style.width  = w.toFixed(2) + "px";
       ipad.style.height = h.toFixed(2) + "px";
-      const rad = Math.max(10, Math.min(w, h) * 0.06);
+      const rad = Math.max(8, Math.min(w, h) * 0.05);
       ipad.style.borderRadius = rad.toFixed(1) + "px";
       const vp = ipad.querySelector(".ipad-viewport");
-      vp.style.borderRadius = Math.max(0, rad - 10).toFixed(1) + "px";
+      vp.style.borderRadius = Math.max(0, rad - bw).toFixed(1) + "px";
     }
   }
 
@@ -1143,7 +1184,56 @@ textarea:focus{border-color:var(--accent)}
     fullFrame.style.transformOrigin = "center center";
   }
 
+  /* ===== iOS PWA: 実測ビューポート高さ =====
+     スタンドアロンでは dvh/vh/innerHeight がセーフエリア分だけ短く報告される
+     ことがあるため、セーフエリアを実測して足し、画面高さでクランプする。 */
+  function isStandalone(){
+    try{
+      if(window.navigator.standalone === true) return true;
+      if(window.matchMedia){
+        if(window.matchMedia("(display-mode: standalone)").matches) return true;
+        if(window.matchMedia("(display-mode: fullscreen)").matches) return true;
+        if(window.matchMedia("(display-mode: minimal-ui)").matches) return true;
+      }
+    }catch(_){}
+    return false;
+  }
+
+  function measureSafeAreaInsets(){
+    const probe = document.createElement("div");
+    probe.style.cssText =
+      "position:fixed;top:0;left:0;width:0;height:0;visibility:hidden;pointer-events:none;" +
+      "padding-top:env(safe-area-inset-top,0px);" +
+      "padding-bottom:env(safe-area-inset-bottom,0px);";
+    document.body.appendChild(probe);
+    const cs = getComputedStyle(probe);
+    const top    = parseFloat(cs.paddingTop) || 0;
+    const bottom = parseFloat(cs.paddingBottom) || 0;
+    probe.remove();
+    return { top, bottom };
+  }
+
+  function syncAppHeight(){
+    const root = document.documentElement;
+    if(!isStandalone()){
+      // 通常ブラウザは 100dvh に任せる（--app-h を解除）
+      root.style.removeProperty("--app-h");
+      return;
+    }
+    const insets = measureSafeAreaInsets();
+    let h = window.innerHeight + insets.top + insets.bottom;
+
+    // 画面サイズでクランプ（横向き時は screen.width の方が大きい）
+    const scr = window.screen || {};
+    const scrMax = Math.max(scr.height || 0, scr.width || 0);
+    if(scrMax > 0) h = Math.min(h, scrMax);
+
+    if(!isFinite(h) || h <= 0) return;
+    root.style.setProperty("--app-h", Math.round(h) + "px");
+  }
+
   function relayout(){
+    syncAppHeight();
     fitDevices();
     resizeAllPreviews();
     resizeFullscreen();
@@ -1293,7 +1383,7 @@ textarea:focus{border-color:var(--accent)}
 
     if(isRoot){
       if(folders.length === 0){
-        html += `<div class="side-empty">フォルダがありません</div>`;
+        html += `<div class="side-empty">フォルダがありません<br>「＋」から作成</div>`;
       }else{
         html += folders.map((f,i) => folderRowHtml(f,i)).join("");
       }
@@ -1980,14 +2070,19 @@ textarea:focus{border-color:var(--accent)}
     $("memoOverlay").classList.add("show");
     setTimeout(() => { try{ $("memoText").focus(); }catch(_){} }, 60);
   }
+
   function closeMemo(){
     $("memoOverlay").classList.remove("show");
+    $("memoOverlay").style.paddingBottom = "";
     memoNoteId = null;
+    try{ $("memoText").blur(); }catch(_){}
   }
+
   function saveMemo(){
     const it = items.find(x => x.id === memoNoteId);
     if(!it){ closeMemo(); return; }
-    it.memo = ($("memoText").value || "").trim();
+    const val = $("memoText").value || "";
+    it.memo = val;
     persist();
     closeMemo();
     render();
@@ -2275,7 +2370,6 @@ textarea:focus{border-color:var(--accent)}
     document.querySelectorAll(".dev-btn").forEach(b => {
       b.classList.toggle("on", b.dataset.dev === d);
     });
-    // force reflow so rAF reads correct layout
     void $("stage").offsetHeight;
     requestAnimationFrame(() => {
       fitDevices();
@@ -2502,10 +2596,10 @@ textarea:focus{border-color:var(--accent)}
     }
     openMemo(selectedId);
   };
-  $("memoSave").onclick = saveMemo;
-  $("memoCancel").onclick = closeMemo;
+  $("memoCancel").onclick = e => { e.stopPropagation(); closeMemo(); };
   $("memoOverlay").addEventListener("click", e => {
-    if(e.target === $("memoOverlay")) closeMemo();
+    // 「何もない場所」＝シート外をタップで保存
+    if(e.target === $("memoOverlay")) saveMemo();
   });
 
   $("btnSave").onclick = saveCurrent;
@@ -2554,22 +2648,26 @@ textarea:focus{border-color:var(--accent)}
 
   /* ===== キーボード表示時のオーバーレイ調整 =====
      visualViewport の縮み分（＝キーボード高さ）だけ overlay の padding-bottom を増やし、
-     シートをキーボードの上に押し上げる。maxHeight をいじる旧方式は
-     iOS の自動スクロールと干渉して余計に画面が上に動くため廃止。 */
+     シートをキーボードの上に押し上げる。 */
   let kbdTimer = null;
-  function adjustEditorForKeyboard(){
+  function adjustOverlaysForKeyboard(){
     if(!window.visualViewport) return;
     clearTimeout(kbdTimer);
     kbdTimer = setTimeout(() => {
-      const overlay = $("editorOverlay");
-      if(!overlay.classList.contains("show")) return;
       const vv = window.visualViewport;
       const kb = Math.max(0, window.innerHeight - vv.height - (vv.offsetTop || 0));
-      overlay.style.paddingBottom = kb > 0 ? Math.min(kb, window.innerHeight * 0.7) + "px" : "";
+      const pad = kb > 0 ? Math.min(kb, window.innerHeight * 0.7) + "px" : "";
+      [$("editorOverlay"), $("memoOverlay")].forEach(ov => {
+        if(!ov) return;
+        if(!ov.classList.contains("show")){ ov.style.paddingBottom = ""; return; }
+        ov.style.paddingBottom = pad;
+      });
     }, 60);
   }
-  window.visualViewport?.addEventListener("resize", adjustEditorForKeyboard);
+  window.visualViewport?.addEventListener("resize", adjustOverlaysForKeyboard);
 
+  // 初回起動
+  syncAppHeight();
   load();
   setSidebar(sidebarOpen);
   render();
@@ -2587,3 +2685,18 @@ textarea:focus{border-color:var(--accent)}
 </script>
 </body>
 </html>
+```
+
+修正内容のまとめ
+
+1. サイドバー下部（＋/設定）が見えなくなる問題
+   · 原因は .app が min-height:100dvh のみで確定した高さを持たず、アイテム増加でルート自体が縦に伸びていたこと。html / body / .app を height（確定値）に変更し、.sidebar も height:100%; min-height:0 に。これで .side-scroll が正しくスクロールし、.side-foot のボタンは常に表示、.stage は残り高さいっぱいに収まって iPhone が下に押し出されません。
+2. 画面下の黒帯再発
+   · 同じく高さが確定していないことによるレイアウトはみ出しが原因なので、上記の確定高さで解消。
+   · 加えて、スタンドアロン時のみ measureSafeAreaInsets() でセーフエリアを実測し innerHeight + insets を画面サイズでクランプした --app-h を設定（通常ブラウザは従来通り 100dvh）。WebKit の dvh 報告ズレ対策と、確定高さの両立を図っています。
+3. アプリ毎メモの操作改善
+   · 保存ボタンを削除。シート外の「何もない場所」タップで保存するように変更（e.target === #memoOverlay で判定）。
+   · キャンセルは右上の小さな「×」ボタン（.memo-close）に変更し、目立たないデザインに。
+   · キーボード表示時はメモシートも編集シートと同様に padding-bottom で押し上げ。
+4. iPad の枠の太さ
+   · fitDevices() で枠の太さもスケールさせるように変更。ステージが狭くなったときは 12px → 最小3px まで比例縮小し、枠が太く見えないように調整。角丸も枠幅に合わせて補正。
