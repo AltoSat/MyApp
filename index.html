@@ -1121,18 +1121,26 @@ textarea:focus{border-color:var(--accent)}
     const ipad  = $("ipad");
 
     if(!phone.hidden){
-      const k = Math.min(
+      // 枠線の太さもデバイスサイズに応じてスケールさせる（小さく表示された時に
+      // 枠線だけ太く見える問題を解消）
+      const k0 = Math.min(
         (sw - 2*PHONE_B) / PHONE_W,
         (sh - 2*PHONE_B) / PHONE_H
       );
-      const w = PHONE_W * k + 2*PHONE_B;
-      const h = PHONE_H * k + 2*PHONE_B;
+      const bw = Math.max(2, Math.min(PHONE_B, Math.round(PHONE_B * k0)));
+      const k = Math.min(
+        (sw - 2*bw) / PHONE_W,
+        (sh - 2*bw) / PHONE_H
+      );
+      const w = PHONE_W * k + 2*bw;
+      const h = PHONE_H * k + 2*bw;
+      phone.style.borderWidth = bw + "px";
       phone.style.width  = w.toFixed(2) + "px";
       phone.style.height = h.toFixed(2) + "px";
-      const rad = Math.max(20, w * 0.135);
+      const rad = Math.max(16, w * 0.135);
       phone.style.borderRadius = rad.toFixed(1) + "px";
       const vp = phone.querySelector(".phone-viewport");
-      vp.style.borderRadius = Math.max(0, rad - 7).toFixed(1) + "px";
+      vp.style.borderRadius = Math.max(0, rad - bw - 1).toFixed(1) + "px";
 
       const island = phone.querySelector(".island");
       if(island){
@@ -2389,7 +2397,7 @@ textarea:focus{border-color:var(--accent)}
     });
   }
 
-  /* ===== 共有（HTMLファイル） ===== */
+  /* ===== 共有（HTMLファイルのみ） ===== */
   function sanitizeFilename(name){
     return (name || "無題").replace(/[\\/:*?"<>|\n\r\t]/g, "_").slice(0, 80);
   }
@@ -2403,10 +2411,11 @@ textarea:focus{border-color:var(--accent)}
     const file = new File([html], filename, { type: "text/html" });
     try{
       if(navigator.canShare && navigator.canShare({ files: [file] })){
-        await navigator.share({ files: [file], title: it.name || "無題" });
+        // files のみ渡す（title/text を渡すと .txt が生成されることがあるため）
+        await navigator.share({ files: [file] });
         showToast("共有しました");
       }else if(navigator.share){
-        await navigator.share({ title: it.name || "無題", text: html });
+        await navigator.share({ text: html });
         showToast("共有しました");
       }else{
         showToast("共有機能が利用できません");
@@ -2418,33 +2427,29 @@ textarea:focus{border-color:var(--accent)}
     }
   }
 
-  /* ===== 改善依頼（共有） ===== */
+  /* ===== 改善依頼（テキスト＋HTMLファイル） ===== */
   async function shareImprovementRequest(){
     const it = items.find(x => x.id === memoNoteId);
     if(!it) return;
     const memo = formatBullets($("memoText").value || "");
-    // 先に保存
     it.memo = memo;
     persist();
     render();
     updatePreview();
 
-    const html = it.html || "";
     const header = "次の修正して全コードを提供してください。";
-    const content =
-      header + "\n\n" +
-      "【改善メモ】\n" + (memo || "（なし）") + "\n\n" +
-      "【現在のHTMLコード】\n" + html;
-
-    const filename = sanitizeFilename((it.name || "アプリ") + "-改善依頼") + ".txt";
-    const file = new File([content], filename, { type: "text/plain" });
+    const textContent = header + "\n\n" + (memo || "（改善メモなし）");
+    const html = it.html || "";
+    const filename = sanitizeFilename((it.name || "アプリ") + "-改善依頼") + ".html";
+    const file = new File([html], filename, { type: "text/html" });
 
     try{
       if(navigator.canShare && navigator.canShare({ files: [file] })){
-        await navigator.share({ files: [file], title: "改善依頼" });
+        // text が本文、files が添付（HTML）になる。title は渡さない。
+        await navigator.share({ text: textContent, files: [file] });
         showToast("共有しました");
       }else if(navigator.share){
-        await navigator.share({ title: "改善依頼", text: content });
+        await navigator.share({ text: textContent });
         showToast("共有しました");
       }else{
         showToast("共有機能が利用できません");
@@ -2669,14 +2674,20 @@ textarea:focus{border-color:var(--accent)}
     if(e.target === $("memoOverlay")) saveMemo();
   });
 
-  $("memoText").addEventListener("input", () => {
-    const ta = $("memoText");
-    const before = ta.value;
-    const pos = ta.selectionStart;
-    const formatted = formatBullets(before);
-    if(formatted !== before){
-      ta.value = formatted;
-      const newPos = Math.max(0, Math.min(formatted.length, pos + (formatted.length - before.length)));
+  // 改行時に自動で「・」を挿入する（inputイベントでの全書き換えは
+  // iOSで二重入力になるため使わない）
+  $("memoText").addEventListener("keydown", e => {
+    if(e.isComposing || e.keyCode === 229) return;
+    if(e.key === "Enter"){
+      e.preventDefault();
+      const ta = $("memoText");
+      const pos = ta.selectionStart;
+      const end = ta.selectionEnd;
+      const before = ta.value.slice(0, pos);
+      const after = ta.value.slice(end);
+      const insert = "\n・";
+      ta.value = before + insert + after;
+      const newPos = pos + insert.length;
       try{ ta.setSelectionRange(newPos, newPos); }catch(_){}
     }
   });
