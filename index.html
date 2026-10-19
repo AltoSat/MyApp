@@ -305,7 +305,7 @@ button:disabled{opacity:.4;pointer-events:none}
   position:absolute;top:0;right:0;bottom:0;display:flex;z-index:1;
 }
 .swipe-actions button{
-  width:76px;min-height:100%;border-radius:0;padding:0;
+  width:64px;min-height:100%;border-radius:0;padding:0;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
   font-size:11px;font-weight:600;color:#fff;background:#48484a;
 }
@@ -314,6 +314,7 @@ button:disabled{opacity:.4;pointer-events:none}
 .swipe-actions .act-edit{background:#0a84ff}
 .swipe-actions .act-move{background:#5e5ce6}
 .swipe-actions .act-rename{background:#5e5ce6}
+.swipe-actions .act-clear{background:#8e8e93}
 .swipe-actions .act-del{background:#ff453a}
 .sidebar:not(.open) .swipe-actions{display:none}
 
@@ -870,6 +871,8 @@ textarea:focus{border-color:var(--accent)}
   const OLD_KEY          = "iphone17pro-pwa-preview-html-v1";
   const LAST_EXPORT_KEY  = "pwa-previewer-last-export-v1";
 
+  const APP_NS_PREFIX = "__app:";
+
   const PHONE_W = 402, PHONE_H = 874, PHONE_B = 6;
   const IPAD_W  = 1366, IPAD_H  = 1024, IPAD_B  = 12;
 
@@ -906,7 +909,8 @@ textarea:focus{border-color:var(--accent)}
     back:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>`,
     edit:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>`,
     move:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13"/><path d="M12.5 6l6 6-6 6"/></svg>`,
-    trash:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>`
+    trash:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>`,
+    eraser: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 20H8.5L2.9 14.4a2 2 0 0 1 0-2.8l9-9a2 2 0 0 1 2.8 0L22 10a2 2 0 0 1 0 2.8l-9 9"/><path d="M7.5 9.5l7 7"/></svg>`
   };
 
   function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
@@ -1050,6 +1054,99 @@ textarea:focus{border-color:var(--accent)}
     updateExportBadge();
   }
 
+  /* ===== アプリデータ管理（案1：名前空間プレフィックス） ===== */
+  function appNamespace(appId){
+    return APP_NS_PREFIX + String(appId || "") + ":";
+  }
+
+  function appStorageInfo(appId){
+    if(!appId) return { count: 0, bytes: 0 };
+    const ns = appNamespace(appId);
+    let count = 0, bytes = 0;
+    for(let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      if(k && k.indexOf(ns) === 0){
+        const v = localStorage.getItem(k) || "";
+        count++;
+        // UTF-16 概算
+        bytes += (k.length + v.length) * 2;
+      }
+    }
+    return { count, bytes };
+  }
+
+  function deleteAppData(appId){
+    if(!appId) return 0;
+    const ns = appNamespace(appId);
+    const keys = [];
+    for(let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      if(k && k.indexOf(ns) === 0) keys.push(k);
+    }
+    keys.forEach(k => {
+      try{ localStorage.removeItem(k); }catch(_){}
+    });
+    return keys.length;
+  }
+
+  function deleteAllAppData(){
+    const keys = [];
+    for(let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      if(k && k.indexOf(APP_NS_PREFIX) === 0) keys.push(k);
+    }
+    keys.forEach(k => {
+      try{ localStorage.removeItem(k); }catch(_){}
+    });
+    return keys.length;
+  }
+
+  /* ===== 名前空間シム（iframe内のlocalStorageをアプリ別に分離） ===== */
+  function buildStorageShim(appId){
+    const idLit = JSON.stringify(String(appId || ""));
+    return '<script>(function(){' +
+      'try{' +
+        'var NS = "__app:" + ' + idLit + ' + ":";' +
+        'var PLS = window.parent && window.parent.localStorage;' +
+        'if(!PLS) return;' +
+        'function ownKeys(){' +
+          'var out=[];' +
+          'for(var i=0;i<PLS.length;i++){' +
+            'var k=PLS.key(i);' +
+            'if(k && k.indexOf(NS)===0) out.push(k.slice(NS.length));' +
+          '}' +
+          'return out;' +
+        '}' +
+        'var fake={' +
+          'getItem:function(k){return PLS.getItem(NS+String(k));},' +
+          'setItem:function(k,v){PLS.setItem(NS+String(k),String(v));},' +
+          'removeItem:function(k){PLS.removeItem(NS+String(k));},' +
+          'clear:function(){ownKeys().forEach(function(k){PLS.removeItem(NS+k);});},' +
+          'key:function(i){var ks=ownKeys();return (i>=0&&i<ks.length)?ks[i]:null;}' +
+        '};' +
+        'Object.defineProperty(fake,"length",{' +
+          'get:function(){return ownKeys().length;},configurable:true' +
+        '});' +
+        'try{' +
+          'Object.defineProperty(window,"localStorage",{' +
+            'configurable:true,get:function(){return fake;}' +
+          '});' +
+        '}catch(e){}' +
+      '}catch(e){}' +
+    '})();<\/script>';
+  }
+
+  function buildSrcdoc(appId, fullHtml){
+    const shim = buildStorageShim(appId);
+    const html = String(fullHtml || "");
+    const headMatch = html.match(/<head[^>]*>/i);
+    if(headMatch && headMatch.index !== undefined){
+      const insertPos = headMatch.index + headMatch[0].length;
+      return html.slice(0, insertPos) + shim + html.slice(insertPos);
+    }
+    return shim + html;
+  }
+
   function load(){
     folders = [];
     try{
@@ -1121,8 +1218,6 @@ textarea:focus{border-color:var(--accent)}
     const ipad  = $("ipad");
 
     if(!phone.hidden){
-      // 枠線の太さもデバイスサイズに応じてスケールさせる（小さく表示された時に
-      // 枠線だけ太く見える問題を解消）
       const k0 = Math.min(
         (sw - 2*PHONE_B) / PHONE_W,
         (sh - 2*PHONE_B) / PHONE_H
@@ -1266,7 +1361,7 @@ textarea:focus{border-color:var(--accent)}
   function updatePreview(){
     const it = items.find(x => x.id === selectedId);
     if(!it){ clearPreviews(); updateMemoIndicator(); return; }
-    const html = (it.html || "") + TAP_BRIDGE;
+    const html = buildSrcdoc(it.id, (it.html || "") + TAP_BRIDGE);
     framePhone.srcdoc = html;
     frameIpad.srcdoc = html;
     updateMemoIndicator();
@@ -1453,6 +1548,7 @@ textarea:focus{border-color:var(--accent)}
       <div class="swipe-actions">
         <button class="act-edit" data-act="edit">${ICON.edit}<span>編集</span></button>
         <button class="act-move" data-act="move">${ICON.move}<span>移動</span></button>
+        <button class="act-clear" data-act="clear">${ICON.eraser}<span>データ</span></button>
         <button class="act-del"  data-act="del">${ICON.trash}<span>削除</span></button>
       </div>
       <div class="srow${sel ? " selected" : ""}">
@@ -1929,6 +2025,7 @@ textarea:focus{border-color:var(--accent)}
     }
     if(act === "edit") openEditor(id, false);
     else if(act === "move") openFolderPicker(id);
+    else if(act === "clear") clearNoteData(id);
     else if(act === "del") deleteNote(id);
   }
 
@@ -1983,17 +2080,29 @@ textarea:focus{border-color:var(--accent)}
   function deleteFolder(id){
     const f = folders.find(x => x.id === id);
     if(!f) return;
-    const n = items.filter(x => x.folderId === id).length;
-    const msg = n > 0
-      ? `フォルダ「${f.name}」と、中のメモ${n}件を削除しますか？`
-      : `フォルダ「${f.name}」を削除しますか？`;
+
+    const targets = items.filter(x => x.folderId === id);
+    const totalInfo = targets.reduce((acc, t) => {
+      const info = appStorageInfo(t.id);
+      return { count: acc.count + info.count, bytes: acc.bytes + info.bytes };
+    }, { count: 0, bytes: 0 });
+
+    let msg;
+    if(targets.length > 0){
+      msg = totalInfo.count > 0
+        ? `フォルダ「${f.name}」と、中のメモ${targets.length}件（保存データ${totalInfo.count}項目 / 約${formatBytes(totalInfo.bytes)}）を削除しますか？`
+        : `フォルダ「${f.name}」と、中のメモ${targets.length}件を削除しますか？`;
+    }else{
+      msg = `フォルダ「${f.name}」を削除しますか？`;
+    }
     if(!confirm(msg)) return;
 
-    const removedIds = items.filter(x => x.folderId === id).map(x => x.id);
+    targets.forEach(x => deleteAppData(x.id));
+    const removedIds = targets.map(x => x.id);
     items   = items.filter(x => x.folderId !== id);
     folders = folders.filter(x => x.id !== id);
 
-    if(removedIds.includes(selectedId)) selectedId = items.length ? items[0].id : null;
+    if(removedIds.indexOf(selectedId) !== -1) selectedId = items.length ? items[0].id : null;
     if(currentFolderId === id) currentFolderId = null;
 
     persist();
@@ -2004,12 +2113,36 @@ textarea:focus{border-color:var(--accent)}
   function deleteNote(id){
     const it = items.find(x => x.id === id);
     if(!it) return;
-    if(!confirm(`「${it.name || "無題"}」を削除しますか？`)) return;
+    const info = appStorageInfo(id);
+    const msg = info.count > 0
+      ? `「${it.name || "無題"}」と、このアプリが保存したデータ（${info.count}項目 / 約${formatBytes(info.bytes)}）を削除しますか？`
+      : `「${it.name || "無題"}」を削除しますか？`;
+    if(!confirm(msg)) return;
+
+    deleteAppData(id);
     items = items.filter(x => x.id !== id);
     if(selectedId === id) selectedId = items.length ? items[0].id : null;
     persist();
     render();
     updatePreview();
+  }
+
+  function clearNoteData(id){
+    const it = items.find(x => x.id === id);
+    if(!it) return;
+    const info = appStorageInfo(id);
+    if(info.count === 0){
+      showToast("保存データはありません");
+      return;
+    }
+    const msg =
+      `「${it.name || "無題"}」の保存データ（${info.count}項目 / 約${formatBytes(info.bytes)}）を削除しますか？\n\n` +
+      `※アプリ本体（HTML）は残ります。`;
+    if(!confirm(msg)) return;
+
+    const n = deleteAppData(id);
+    showToast(`${n}項目を削除しました`);
+    render();
   }
 
   function moveNoteToFolder(noteId, folderId){
@@ -2366,7 +2499,7 @@ textarea:focus{border-color:var(--accent)}
   function openFullscreen(){
     const it = items.find(x => x.id === selectedId);
     if(!it){ alert("表示するメモを一覧から選んでください"); return; }
-    fullFrame.srcdoc = it.html || "";
+    fullFrame.srcdoc = buildSrcdoc(it.id, it.html || "");
     $("fullscreen").classList.add("show");
     requestAnimationFrame(resizeFullscreen);
   }
@@ -2411,7 +2544,6 @@ textarea:focus{border-color:var(--accent)}
     const file = new File([html], filename, { type: "text/html" });
     try{
       if(navigator.canShare && navigator.canShare({ files: [file] })){
-        // files のみ渡す（title/text を渡すと .txt が生成されることがあるため）
         await navigator.share({ files: [file] });
         showToast("共有しました");
       }else if(navigator.share){
@@ -2445,7 +2577,6 @@ textarea:focus{border-color:var(--accent)}
 
     try{
       if(navigator.canShare && navigator.canShare({ files: [file] })){
-        // text が本文、files が添付（HTML）になる。title は渡さない。
         await navigator.share({ text: textContent, files: [file] });
         showToast("共有しました");
       }else if(navigator.share){
@@ -2557,6 +2688,9 @@ textarea:focus{border-color:var(--accent)}
       );
 
       if(replace){
+        // 既存の全アプリ保存データを一掃（孤児化を防ぐ）
+        deleteAllAppData();
+
         folders = parsed.folders;
         items = parsed.items;
       }else{
@@ -2674,8 +2808,6 @@ textarea:focus{border-color:var(--accent)}
     if(e.target === $("memoOverlay")) saveMemo();
   });
 
-  // 改行時に自動で「・」を挿入する（inputイベントでの全書き換えは
-  // iOSで二重入力になるため使わない）
   $("memoText").addEventListener("keydown", e => {
     if(e.isComposing || e.keyCode === 229) return;
     if(e.key === "Enter"){
