@@ -880,11 +880,18 @@ textarea:focus{border-color:var(--accent)}
   const SB_EXPAND_DX_FOLDER = 200;
   const SB_EXPAND_DX_ROOT   = 45;
 
-  const TAP_BRIDGE =
+  /* ===== 改善①：TAP_BRIDGE → INJECTED_RUNTIME（タップ＋エラー通知） ===== */
+  const INJECTED_RUNTIME =
     '<script>(function(){' +
-    'var send=function(){try{parent.postMessage({__pwaPreviewTap:1},"*");}catch(e){}};' +
-    'document.addEventListener("click",send,true);' +
-    'document.addEventListener("pointerup",send,true);' +
+      'var send=function(){try{parent.postMessage({__pwaPreviewTap:1},"*");}catch(e){}};' +
+      'document.addEventListener("click",send,true);' +
+      'document.addEventListener("pointerup",send,true);' +
+      'window.addEventListener("error",function(e){' +
+        'try{parent.postMessage({__pwaPreviewError:String(e.message||e.error||"unknown")},"*");}catch(_){}' +
+      '});' +
+      'window.addEventListener("unhandledrejection",function(e){' +
+        'try{parent.postMessage({__pwaPreviewError:"Unhandled: "+String(e.reason||"unknown")},"*");}catch(_){}' +
+      '});' +
     '})();<\/script>';
 
   let items = [];
@@ -1136,15 +1143,43 @@ textarea:focus{border-color:var(--accent)}
     '})();<\/script>';
   }
 
+  /* ===== 改善②：buildSrcdoc を安全な注入位置に変更 ===== */
   function buildSrcdoc(appId, fullHtml){
     const shim = buildStorageShim(appId);
-    const html = String(fullHtml || "");
+    let html = String(fullHtml || "");
+
+    // 旧バージョン TAP_BRIDGE 残骸の除去（安全弁）
+    html = html.replace(/\s*<script>\(function\(\)\{var send=function\(\)\{try\{parent\.postMessage\(\{__pwaPreviewTap:1\},"\*"\);\}catch\(e\)\{\}\};[\s\S]*?\}\)\(\);<\/script>\s*$/i, "");
+
+    // <base target="_self"> でリンク誤動作防止
+    const baseTag = '<base target="_self">';
+
+    // shim + base を <meta charset> 直後（無ければ <head> 直後）へ
+    const charsetMatch = html.match(/<meta[^>]+charset=[^>]*>/i);
     const headMatch = html.match(/<head[^>]*>/i);
-    if(headMatch && headMatch.index !== undefined){
-      const insertPos = headMatch.index + headMatch[0].length;
-      return html.slice(0, insertPos) + shim + html.slice(insertPos);
+
+    if(charsetMatch && charsetMatch.index !== undefined){
+      const pos = charsetMatch.index + charsetMatch[0].length;
+      html = html.slice(0, pos) + shim + baseTag + html.slice(pos);
+    }else if(headMatch && headMatch.index !== undefined){
+      const pos = headMatch.index + headMatch[0].length;
+      html = html.slice(0, pos) + shim + baseTag + html.slice(pos);
+    }else if(/<html[^>]*>/i.test(html)){
+      html = html.replace(/<html([^>]*)>/i, '<html$1><head>' + shim + baseTag + '</head>');
+    }else{
+      html = shim + baseTag + html;
     }
-    return shim + html;
+
+    // runtime を </body> 直前に注入（無ければ </html> 直前）
+    if(/<\/body>/i.test(html)){
+      html = html.replace(/<\/body>/i, INJECTED_RUNTIME + '</body>');
+    }else if(/<\/html>/i.test(html)){
+      html = html.replace(/<\/html>/i, INJECTED_RUNTIME + '</html>');
+    }else{
+      html = html + INJECTED_RUNTIME;
+    }
+
+    return html;
   }
 
   function load(){
@@ -1358,14 +1393,31 @@ textarea:focus{border-color:var(--accent)}
     $("btnMemo").classList.toggle("has-memo", hasMemo);
   }
 
+  /* ===== 改善③：updatePreview（bridge二重付与を撤去）＋ checkIframeRender ===== */
   function updatePreview(){
     const it = items.find(x => x.id === selectedId);
     if(!it){ clearPreviews(); updateMemoIndicator(); return; }
-    const html = buildSrcdoc(it.id, (it.html || "") + TAP_BRIDGE);
+    const html = buildSrcdoc(it.id, it.html || "");
     framePhone.srcdoc = html;
     frameIpad.srcdoc = html;
     updateMemoIndicator();
     requestAnimationFrame(resizeAllPreviews);
+    checkIframeRender(framePhone, "iPhone");
+    checkIframeRender(frameIpad, "iPad");
+  }
+
+  function checkIframeRender(iframe, label){
+    setTimeout(() => {
+      try{
+        const doc = iframe.contentDocument;
+        if(!doc || !doc.body) return;
+        const childCount = doc.body.children.length;
+        if(childCount === 0){
+          console.warn(`[${label}] iframe body is empty`);
+          showToast(`${label}プレビューが空です（HTMLを確認してください）`);
+        }
+      }catch(_){ /* cross-origin時は無視 */ }
+    }, 400);
   }
 
   function handleOutsideTap(){
@@ -1377,18 +1429,32 @@ textarea:focus{border-color:var(--accent)}
     if(sidebarOpen) setSidebar(false);
   }
 
+  /* ===== 改善④：メッセージ受信でタップ＋エラーの両方を扱う ===== */
   window.addEventListener("message", e => {
     const d = e.data;
-    if(!d || typeof d !== "object" || !d.__pwaPreviewTap) return;
-    let ok = false;
-    try{
-      ok = (e.source === framePhone.contentWindow) || (e.source === frameIpad.contentWindow);
-    }catch(_){ ok = true; }
-    if(!ok) return;
-    const now = Date.now();
-    if(now - (handleOutsideTap.__last || 0) < 120) return;
-    handleOutsideTap.__last = now;
-    handleOutsideTap();
+    if(!d || typeof d !== "object") return;
+
+    // タップ通知
+    if(d.__pwaPreviewTap){
+      let ok = false;
+      try{
+        ok = (e.source === framePhone.contentWindow) || (e.source === frameIpad.contentWindow);
+      }catch(_){ ok = true; }
+      if(!ok) return;
+      const now = Date.now();
+      if(now - (handleOutsideTap.__last || 0) < 120) return;
+      handleOutsideTap.__last = now;
+      handleOutsideTap();
+      return;
+    }
+
+    // エラー通知（プレビュー内のJSエラーを可視化）
+    if(d.__pwaPreviewError){
+      const msg = String(d.__pwaPreviewError || "unknown");
+      console.error("[preview error]", msg);
+      showToast("プレビュー内エラー: " + msg.slice(0, 40));
+      return;
+    }
   });
 
   let toastTimer = null;
@@ -2688,7 +2754,6 @@ textarea:focus{border-color:var(--accent)}
       );
 
       if(replace){
-        // 既存の全アプリ保存データを一掃（孤児化を防ぐ）
         deleteAllAppData();
 
         folders = parsed.folders;
